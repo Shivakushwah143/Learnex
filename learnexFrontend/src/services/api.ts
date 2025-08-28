@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from 'axios';
 import { Course, AuthResponse, ApiResponse, User } from '../types';
 
-const API_BASE_URL = 'http://localhost:8080'; // Replace with your actual API URL
+const API_BASE_URL = 'https://learnex.onrender.com'; // Replace with your actual API URL
 
 const api = axios.create({
   baseURL: API_BASE_URL,
