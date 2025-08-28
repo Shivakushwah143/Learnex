@@ -22,15 +22,15 @@ app.use(
 app.use(express.json());
 
 const userSchema = new mongoose.Schema({
-  userName: { type: String },
-  password: { type: String },
+  userName: { type: String, required: true ,unique: true },
+  password: { type: String ,required:true},
   purchaseCources:  [{ type: mongoose.Types.ObjectId, ref: "Course" }]
   ,
 });
 
 const adminSchema = new mongoose.Schema({
-  userName: String,
-  password: String,
+  userName:  { type: String, required: true ,unique: true },
+  password:  { type: String, required: true },
 });
 
 const CourseSchema = new mongoose.Schema({
@@ -54,6 +54,9 @@ const authenticateAdminJwt = (req, res, next) => {
     console.log(token);
     jwt.verify(token, secret, (err, user) => {
       if (err) {
+        return res.sendStatus(403);
+      }
+      if (user.role !== 'admin') {
         return res.sendStatus(403);
       }
       req.user = user;
@@ -85,7 +88,7 @@ const authenticateUserJwt = (req, res, next) => {
 };
 
 // Get all published courses for users
-app.get("/users/courses", authenticateUserJwt, async (req, res) => {
+app.get("/users/courses", async (req, res) => {
   try {
     const courses = await Course.find({ publish: true });
     res.json({ courses });
@@ -190,39 +193,6 @@ app.post("/admin/login", async (req, res) => {
   }
 });
 
-app.post("/user/signup", async (req, res) => {
-  try {
-    const { userName, password } = req.body;
-
-    if (!userName || !password) {
-      return res.status(400).json({ message: "All fields required" });
-    }
-
-    const existingUser = await User.findOne({ userName });
-    if (existingUser) {
-      return res.status(409).json({ message: "User already exists" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({
-      userName,
-      password: hashedPassword,
-    });
-
-    await newUser.save();
-
-    const token = jwt.sign({ userName, role: "user" }, secret, {
-      expiresIn: "1h",
-    });
-
-    res.status(201).json({ message: "User created", token });
-  } catch (error) {
-    console.error("User signup error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-});
-
 app.post("/user/login", async (req, res) => {
   
   const { userName, password } = req.body;
@@ -253,7 +223,7 @@ app.post("/user/login", async (req, res) => {
 
 });
 
-// // course created
+ // course created
 app.post("/admin/courses", authenticateAdminJwt, async (req, res) => {
   try {
     console.log(`admin user name user: ${req.user.userName}`);
@@ -272,11 +242,11 @@ app.post("/admin/courses", authenticateAdminJwt, async (req, res) => {
   }
 });
 
-app.post("/admin/signup", async (req, res) => {
+app.post("/user/signup", async (req, res) => {
   const { userName, password } = req.body;
   console.log(req.body);
   const hashedPassword = await bcrypt.hash(password, 8);
-  const newuser = new Admin({ userName, password: hashedPassword });
+  const newuser = new User({ userName, password: hashedPassword });
   await newuser.save();
   const token = jwt.sign({ userName, role: "admin" }, secret, {
     expiresIn: "1h",
@@ -305,6 +275,19 @@ app.put("/admin/courses/:courseId", authenticateAdminJwt, async (req, res) => {
   }
 });
 
+app.delete("/admin/courses/:courseId", authenticateAdminJwt, async (req, res) => {
+   console.log(req.params.courseId)
+  try {
+    const course = await Course.findByIdAndDelete(req.params.courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+    return res.json({ message: "Course deleted successfully" });
+  } catch (error) {
+    console.error("Error in delete:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
 app.get("/admin/courses/:courseId", authenticateAdminJwt, async (req, res) => {
   try {
     const singleCourse = await Course.findById(req.params.courseId);
@@ -319,6 +302,14 @@ app.get("/admin/courses/:courseId", authenticateAdminJwt, async (req, res) => {
 
 
 app.get("/admin/me", authenticateAdminJwt, async (req, res) => {
+  res.json({
+    userName: req.user.userName,
+  });
+});
+
+
+
+app.get("/user/me", authenticateUserJwt, async (req, res) => {
   res.json({
     userName: req.user.userName,
   });
